@@ -25,7 +25,9 @@ export class UriTemplate {
         }
     }
     private readonly template: string;
-    private readonly parts: Array<string | { name: string; operator: string; names: string[]; exploded: boolean }>;
+    private readonly parts: Array<
+        string | { name: string; operator: string; names: string[]; exploded: boolean; prefixLengths: Record<string, number> }
+    >;
 
     get variableNames(): string[] {
         return this.parts.flatMap(part => (typeof part === 'string' ? [] : part.names));
@@ -41,8 +43,12 @@ export class UriTemplate {
         return this.template;
     }
 
-    private parse(template: string): Array<string | { name: string; operator: string; names: string[]; exploded: boolean }> {
-        const parts: Array<string | { name: string; operator: string; names: string[]; exploded: boolean }> = [];
+    private parse(
+        template: string
+    ): Array<string | { name: string; operator: string; names: string[]; exploded: boolean; prefixLengths: Record<string, number> }> {
+        const parts: Array<
+            string | { name: string; operator: string; names: string[]; exploded: boolean; prefixLengths: Record<string, number> }
+        > = [];
         let currentText = '';
         let i = 0;
         let expressionCount = 0;
@@ -66,13 +72,14 @@ export class UriTemplate {
                 const exploded = expr.includes('*');
                 const names = this.getNames(expr);
                 const name = names[0]!;
+                const prefixLengths = this.getPrefixLengths(expr);
 
                 // Validate variable name length
                 for (const name of names) {
                     UriTemplate.validateLength(name, MAX_VARIABLE_LENGTH, 'Variable name');
                 }
 
-                parts.push({ name, operator, names, exploded });
+                parts.push({ name, operator, names, exploded, prefixLengths });
                 i = end + 1;
             } else {
                 currentText += template[i];
@@ -97,8 +104,51 @@ export class UriTemplate {
         return expr
             .slice(operator.length)
             .split(',')
-            .map(name => name.replace('*', '').trim())
+            .map(name => UriTemplate.variableNameOf(name))
             .filter(name => name.length > 0);
+    }
+
+    /**
+     * The prefix modifier lengths of an expression's variables, keyed by the
+     * variable name (`{year:2}` => `{ year: 2 }`). RFC 6570 section 2.4.1: the
+     * expansion of a prefixed variable is the first `length` characters of its
+     * value, and the modifier is not part of the variable name.
+     */
+    private getPrefixLengths(expr: string): Record<string, number> {
+        const operator = this.getOperator(expr);
+        const prefixLengths: Record<string, number> = {};
+        for (const raw of expr.slice(operator.length).split(',')) {
+            const name = UriTemplate.variableNameOf(raw);
+            const length = UriTemplate.prefixLengthOf(raw);
+            if (name.length > 0 && length !== undefined) {
+                prefixLengths[name] = length;
+            }
+        }
+        return prefixLengths;
+    }
+
+    /** The variable name of one expression item, without its `*`/`:length` modifiers. */
+    private static variableNameOf(rawName: string): string {
+        const withoutExplode = rawName.replace('*', '').trim();
+        const colon = withoutExplode.indexOf(':');
+        return colon === -1 ? withoutExplode : withoutExplode.slice(0, colon).trim();
+    }
+
+    /** The `:length` prefix modifier of one expression item, when present and numeric. */
+    private static prefixLengthOf(rawName: string): number | undefined {
+        const withoutExplode = rawName.replace('*', '').trim();
+        const colon = withoutExplode.indexOf(':');
+        if (colon === -1) {
+            return undefined;
+        }
+        const value = withoutExplode.slice(colon + 1).trim();
+        return /^\d+$/.test(value) ? Number(value) : undefined;
+    }
+
+    /** The first `length` characters of `value` when the variable carries a prefix modifier. */
+    private applyPrefix(value: string, part: { prefixLengths: Record<string, number> }, name: string): string {
+        const length = part.prefixLengths[name];
+        return length === undefined ? value : value.slice(0, length);
     }
 
     private encodeValue(value: string, operator: string): string {
@@ -115,6 +165,7 @@ export class UriTemplate {
             operator: string;
             names: string[];
             exploded: boolean;
+            prefixLengths: Record<string, number>;
         },
         variables: Variables
     ): string {
@@ -124,8 +175,8 @@ export class UriTemplate {
                     const value = variables[name];
                     if (value === undefined) return '';
                     const encoded = Array.isArray(value)
-                        ? value.map(v => this.encodeValue(v, part.operator)).join(',')
-                        : this.encodeValue(value.toString(), part.operator);
+                        ? value.map(v => this.encodeValue(this.applyPrefix(v, part, name), part.operator)).join(',')
+                        : this.encodeValue(this.applyPrefix(value.toString(), part, name), part.operator);
                     return `${name}=${encoded}`;
                 })
                 .filter(pair => pair.length > 0);
@@ -145,7 +196,7 @@ export class UriTemplate {
         if (value === undefined) return '';
 
         const values = Array.isArray(value) ? value : [value];
-        const encoded = values.map(v => this.encodeValue(v, part.operator));
+        const encoded = values.map(v => this.encodeValue(this.applyPrefix(v, part, part.name), part.operator));
 
         switch (part.operator) {
             case '': {

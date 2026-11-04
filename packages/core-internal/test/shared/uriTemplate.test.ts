@@ -1,4 +1,4 @@
-import { UriTemplate } from '../../src/shared/uriTemplate';
+import { UriTemplate } from '../src/shared/uriTemplate.js';
 
 describe('UriTemplate', () => {
     describe('isTemplate', () => {
@@ -310,5 +310,28 @@ describe('UriTemplate', () => {
             // Should complete in under 100ms, not hang for seconds
             expect(elapsed).toBeLessThan(100);
         });
+    });
+});
+
+describe('prefix modifiers (RFC 6570 section 2.4.1)', () => {
+    it('should expand a prefixed variable to its first N characters', () => {
+        const template = new UriTemplate('http://example.com/{year:2}');
+        expect(template.expand({ year: '2024' })).toBe('http://example.com/20');
+    });
+
+    it('should keep the whole value when it is shorter than the prefix', () => {
+        expect(new UriTemplate('{v:5}').expand({ v: 'ab' })).toBe('ab');
+    });
+
+    it('should report the variable name without its prefix modifier', () => {
+        expect(new UriTemplate('{year:2}').variableNames).toEqual(['year']);
+    });
+
+    it('should match a prefixed variable under its plain name', () => {
+        expect(new UriTemplate('http://example.com/{year:2}').match('http://example.com/20')).toEqual({ year: '20' });
+    });
+
+    it('should leave an unprefixed variable unchanged', () => {
+        expect(new UriTemplate('{year}').expand({ year: '2024' })).toBe('2024');
     });
 });
