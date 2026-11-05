@@ -109,6 +109,9 @@ export class StdioClientTransport implements Transport {
     private _readBuffer: ReadBuffer;
     private _serverParams: StdioServerParameters;
     private _stderrStream: PassThrough | null = null;
+    private _stdinErrorHandler?: (error: Error) => void;
+    private _stdoutDataHandler?: (chunk: Buffer) => void;
+    private _stdoutErrorHandler?: (error: Error) => void;
 
     onclose?: () => void;
     onerror?: (error: Error) => void;
@@ -159,11 +162,12 @@ export class StdioClientTransport implements Transport {
                 this.onclose?.();
             });
 
-            this._process.stdin?.on('error', error => {
+            this._stdinErrorHandler = error => {
                 this.onerror?.(error);
-            });
+            };
+            this._process.stdin?.on('error', this._stdinErrorHandler);
 
-            this._process.stdout?.on('data', chunk => {
+            this._stdoutDataHandler = chunk => {
                 try {
                     this._readBuffer.append(chunk);
                     this.processReadBuffer();
@@ -171,11 +175,13 @@ export class StdioClientTransport implements Transport {
                     this.onerror?.(error as Error);
                     this.close().catch(() => {});
                 }
-            });
+            };
+            this._process.stdout?.on('data', this._stdoutDataHandler);
 
-            this._process.stdout?.on('error', error => {
+            this._stdoutErrorHandler = error => {
                 this.onerror?.(error);
-            });
+            };
+            this._process.stdout?.on('error', this._stdoutErrorHandler);
 
             if (this._stderrStream && this._process.stderr) {
                 this._process.stderr.pipe(this._stderrStream);
@@ -278,8 +284,8 @@ export class StdioClientTransport implements Transport {
     }
 
     async close(): Promise<void> {
-        if (this._process) {
-            const processToClose = this._process;
+        const processToClose = this._process;
+        if (processToClose) {
             this._process = undefined;
 
             const closePromise = new Promise<void>(resolve => {
@@ -315,7 +321,37 @@ export class StdioClientTransport implements Transport {
             }
         }
 
+        if (processToClose) {
+            this._detachProcessListeners(processToClose);
+        }
         this._readBuffer.clear();
+    }
+
+    /**
+     * Removes the listeners this transport attached to the child's pipes.
+     *
+     * Without this the parent keeps a `data` listener on stdout, two `error`
+     * listeners and — because `pipe()` adds one — a `drain` listener on stderr
+     * for every transport that was ever started. Reconnecting in a loop walks
+     * straight into `MaxListenersExceededWarning`, and the retained pipes keep
+     * the parent's event loop alive.
+     */
+    private _detachProcessListeners(proc: ChildProcess): void {
+        if (this._stdinErrorHandler) {
+            proc.stdin?.off('error', this._stdinErrorHandler);
+            this._stdinErrorHandler = undefined;
+        }
+        if (this._stdoutDataHandler) {
+            proc.stdout?.off('data', this._stdoutDataHandler);
+            this._stdoutDataHandler = undefined;
+        }
+        if (this._stdoutErrorHandler) {
+            proc.stdout?.off('error', this._stdoutErrorHandler);
+            this._stdoutErrorHandler = undefined;
+        }
+        if (this._stderrStream) {
+            proc.stderr?.unpipe(this._stderrStream);
+        }
     }
 
     send(message: JSONRPCMessage): Promise<void> {
