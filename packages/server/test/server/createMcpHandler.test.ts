@@ -415,7 +415,8 @@ describe("createMcpHandler — modern-only strict (legacy: 'reject')", () => {
             const response = await handler.fetch(new Request('http://localhost/mcp', { method }));
             expect(response.status).toBe(405);
             const body = (await response.json()) as JSONRPCErrorBody;
-            expect(body.error.code).toBe(-32_000);
+            // Not tied to a handshake revision, so it stays out of the legacy -32000 range.
+            expect(body.error.code).toBe(-32_600);
             expect(body.error.message).toBe('Method not allowed.');
             // Body-less methods carry no request id to echo.
             expect(body.id).toBeNull();
@@ -548,7 +549,7 @@ describe('createMcpHandler — stateless legacy fallback (the default)', () => {
             expect(response.status).toBe(405);
             expect(response.headers.get('Allow')).toBe('POST');
             const body = (await response.json()) as JSONRPCErrorBody;
-            expect(body.error.code).toBe(-32_000);
+            expect(body.error.code).toBe(-32_600);
             expect(body.error.message).toBe('Method not allowed.');
         }
     });

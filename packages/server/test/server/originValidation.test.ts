@@ -88,7 +88,9 @@ describe('originValidationResponse', () => {
         expect(response!.status).toBe(403);
         const body = (await response!.json()) as { jsonrpc: string; error: { code: number; message: string }; id: unknown };
         expect(body.jsonrpc).toBe('2.0');
-        expect(body.error.code).toBe(-32_000);
+        // Host/Origin validation runs before any era is chosen, so the rejection uses a
+        // standard code instead of the legacy -32000 range 2026-07-28 deprecates.
+        expect(body.error.code).toBe(-32_600);
         expect(body.error.message).toContain('Invalid Origin');
         expect(body.id).toBeNull();
     });

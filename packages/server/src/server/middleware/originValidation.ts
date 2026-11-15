@@ -15,6 +15,8 @@
  * do not send one.
  */
 
+import { ProtocolErrorCode } from '@modelcontextprotocol/core-internal';
+
 export type OriginValidationResult =
     | { ok: true; origin?: string; hostname?: string }
     | {
@@ -94,7 +96,7 @@ export function originValidationResponse(req: Request, allowedOriginHostnames: s
         {
             jsonrpc: '2.0',
             error: {
-                code: -32_000,
+                code: ProtocolErrorCode.InvalidRequest,
                 message: result.message
             },
             id: null

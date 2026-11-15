@@ -270,11 +270,11 @@ describe('SEP-2243 standard-header validation is era-gated', () => {
         // The modern era is POST-only, so a body-less session operation never
         // reaches a modern route and the presence rung cannot fire on it —
         // whatever it lacks in standard headers. It is answered by the
-        // http-method rung instead: 405 / -32000, never 400 / -32020.
+        // http-method rung instead: 405 / -32600, never 400 / -32020.
         const handler = createMcpHandler(makeFactory());
         const response = await handler.fetch(new Request('http://localhost/mcp', { method: httpMethod }));
         expect(response.status).toBe(405);
         const body = (await response.json()) as { error: { code: number } };
-        expect(body.error.code).toBe(-32_000);
+        expect(body.error.code).toBe(-32_600);
     });
 });

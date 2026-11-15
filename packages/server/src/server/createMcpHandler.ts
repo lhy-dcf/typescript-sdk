@@ -47,6 +47,7 @@ import {
     missingClientCapabilities,
     MissingRequiredClientCapabilityError,
     modernOnlyStrictRejection,
+    ProtocolErrorCode,
     requestMetaOf,
     requiredClientCapabilitiesForRequest,
     scanXMcpHeaderDeclarations,
@@ -336,7 +337,7 @@ function createLegacyStatelessFallback(
 ): LegacyHttpHandler {
     return async (request, options) => {
         if (request.method.toUpperCase() !== 'POST') {
-            return jsonRpcErrorResponse(405, -32_000, 'Method not allowed.');
+            return jsonRpcErrorResponse(405, ProtocolErrorCode.InvalidRequest, 'Method not allowed.');
         }
         try {
             const product = await factory({

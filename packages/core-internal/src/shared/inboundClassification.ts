@@ -981,7 +981,13 @@ export function modernOnlyStrictRejection(
 ): InboundLadderRejection | undefined {
     switch (route.reason) {
         case 'http-method': {
-            return rejection('http-method', 'modern-only-method-not-allowed', 405, new ProtocolError(-32_000, 'Method not allowed.'), true);
+            return rejection(
+                'http-method',
+                'modern-only-method-not-allowed',
+                405,
+                new ProtocolError(ProtocolErrorCode.InvalidRequest, 'Method not allowed.'),
+                true
+            );
         }
         case 'batch': {
             return rejection(

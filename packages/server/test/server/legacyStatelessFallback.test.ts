@@ -89,7 +89,9 @@ describe('legacyStatelessFallback', () => {
             expect(response.status).toBe(405);
             expect(response.headers.get('Allow')).toBe('POST');
             const body = (await response.json()) as JSONRPCErrorBody;
-            expect(body.error.code).toBe(-32_000);
+            // Method routing is not tied to a handshake revision: 2026-07-28 marks
+            // -32000 to -32019 legacy, so the rejection carries -32600.
+            expect(body.error.code).toBe(-32_600);
             expect(body.error.message).toBe('Method not allowed.');
             expect(body.id).toBeNull();
         }

@@ -461,11 +461,13 @@ describe('modern-only (strict) rejection mapping', () => {
         });
     });
 
-    test('non-POST methods are not allowed on a modern-only endpoint', () => {
+    test('non-POST methods are not allowed on a modern-only endpoint, and answer a non-legacy code', () => {
         const route = classifyInboundRequest({ httpMethod: 'GET' }) as InboundLegacyRoute;
+        // 2026-07-28 marks -32000 to -32019 legacy and tells new implementations not to use
+        // them; this rejection is not tied to a handshake revision, so it carries -32600.
         expect(modernOnlyStrictRejection(route, SUPPORTED)).toMatchObject({
             httpStatus: 405,
-            code: -32_000,
+            code: -32_600,
             message: 'Method not allowed.'
         });
     });

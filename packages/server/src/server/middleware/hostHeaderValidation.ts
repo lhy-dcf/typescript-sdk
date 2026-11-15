@@ -1,3 +1,5 @@
+import { ProtocolErrorCode } from '@modelcontextprotocol/core-internal';
+
 export type HostHeaderValidationResult =
     | { ok: true; hostname: string }
     | {
@@ -56,7 +58,7 @@ export function hostHeaderValidationResponse(req: Request, allowedHostnames: str
         {
             jsonrpc: '2.0',
             error: {
-                code: -32_000,
+                code: ProtocolErrorCode.InvalidRequest,
                 message: result.message
             },
             id: null

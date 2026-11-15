@@ -227,8 +227,10 @@ const SHEET: readonly SheetRow[] = [
         conformance: [],
         input: { httpMethod: 'DELETE' },
         strict: true,
-        reject: { rung: 'http-method', httpStatus: 405, code: -32_000, settled: true },
-        rationale: 'Without legacy serving configured there is nothing to route GET/DELETE to.'
+        reject: { rung: 'http-method', httpStatus: 405, code: -32_600, settled: true },
+        rationale:
+            'Without legacy serving configured there is nothing to route GET/DELETE to. ' +
+            'The rejection is not tied to a handshake revision, so it avoids the legacy -32000 range.'
     },
     {
         cell: 'modern-only-batch-not-supported',
